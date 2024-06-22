@@ -2,82 +2,85 @@ import yfinance as yf
 import streamlit as st
 import pandas as pd
 import datetime
-
 import numpy as np
-import matplotlib.pyplot as plt
-from keras.models import Sequential
-from keras.layers import LSTM
-from keras.layers import Dense
-from keras.layers import Bidirectional
-
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
 
 st.write("""
 # Simple Stock Price App
 
-Shown are the stock **closing price** and **volume**.
+Shown are the stock **closing price** and **volume**, along with LSTM predictions.
 """)
 
-def user_input_features() :
-    stock_symbol = st.sidebar.selectbox('Symbol',('BMRI','APLN', 'MNCN', 'BFIN', 'CSAP'))
+def user_input_features():
+    stock_symbol = st.sidebar.selectbox('Symbol', ('BMRI.JK', 'APLN.JK', 'MNCN.JK', 'BFIN.JK', 'CSAP.JK'))
     date_start = st.sidebar.date_input("Start Date", datetime.date(2015, 5, 31))
     date_end = st.sidebar.date_input("End Date", datetime.date.today())
 
-    tickerData = yf.Ticker(stock_symbol+'.JK')
+    tickerData = yf.Ticker(stock_symbol)
     tickerDf = tickerData.history(period='1d', start=date_start, end=date_end)
-    return tickerDf, stock_symbol
+    return tickerDf
 
-input_df, stock_symbol = user_input_features()
+input_df = user_input_features()
 
-st.line_chart(input_df.Close)
-st.line_chart(input_df.Volume)
+# Normalisasi data
+scaler = MinMaxScaler(feature_range=(0,1))
+scaled_data = scaler.fit_transform(input_df['Close'].values.reshape(-1,1))
 
-st.write("""
-# Stock Price Prediction
+# Membuat data pelatihan
+training_data_len = int(np.ceil(len(scaled_data) * .95))
 
-Shown are the stock prediction for next 20 days.
-""")
+train_data = scaled_data[0:int(training_data_len), :]
 
-n_steps = 100
-n_features = 1
+x_train = []
+y_train = []
 
+for i in range(60, len(train_data)):
+    x_train.append(train_data[i-60:i, 0])
+    y_train.append(train_data[i, 0])
+
+x_train, y_train = np.array(x_train), np.array(y_train)
+
+# Reshape data
+x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
+
+# Membangun model LSTM
 model = Sequential()
-model.add(Bidirectional(LSTM(300, activation='relu'), input_shape=(n_steps, n_features)))
-model.add(Dense(1))
-model.compile(optimizer='adam', loss='mse')
+model.add(LSTM(units=50, return_sequences=True, input_shape=(x_train.shape[1], 1)))
+model.add(LSTM(units=50, return_sequences=False))
+model.add(Dense(units=25))
+model.add(Dense(units=1))
 
-model.load_weights(stock_symbol + ".h5")
-df = input_df.dropna(axis=0, how='any', thresh=None, subset=None, inplace=False)
-df = df[df.Volume > 0]
+# Compile model
+model.compile(optimizer='adam', loss='mean_squared_error')
 
-close = df['Close'][-n_steps:].to_list()
-min_in = min(close)
-max_in = max(close)
-in_seq = []
-for i in close :
-  in_seq.append((i - min_in) / (max_in - min_in))
+# Melatih model
+model.fit(x_train, y_train, batch_size=1, epochs=1)
 
-for i in range(20) :
-  x_input = np.array(in_seq[-100:])
-  x_input = x_input.reshape((1, n_steps, n_features))
-  yhat = model.predict(x_input, verbose=0)
-  in_seq.append(yhat[0][0])
+# Membuat data testing
+test_data = scaled_data[training_data_len - 60:, :]
+x_test = []
+y_test = input_df['Close'][training_data_len:].values
 
-norm_res = in_seq[-20:]
-res = []
-for i in norm_res :
-  res.append(i * (max_in - min_in) + min_in)
+for i in range(60, len(test_data)):
+    x_test.append(test_data[i-60:i, 0])
 
-closepred = close[-80:]
-for x in res :
-  closepred.append(x)
+x_test = np.array(x_test)
 
-plt.figure(figsize = (20,10))
-plt.plot(closepred, label="Prediction")
-plt.plot(close[-80:], label="Previous")
-plt.ylabel('Price (Rp)', fontsize = 15 )
-plt.xlabel('Days', fontsize = 15 )
-plt.title(stock_symbol + " Stock Prediction", fontsize = 20)
-plt.legend()
-plt.grid()
+# Reshape data
+x_test = np.reshape(x_test, (x_test.shape[0], x_test.shape[1], 1))
 
-st.pyplot(plt)
+# Membuat prediksi
+predictions = model.predict(x_test)
+predictions = scaler.inverse_transform(predictions)
+
+# Menampilkan grafik harga penutupan
+st.line_chart(input_df['Close'])
+# Menampilkan grafik volume perdagangan
+st.line_chart(input_df['Volume'])
+
+# Menampilkan prediksi LSTM
+input_df['Predictions'] = np.nan
+input_df['Predictions'][training_data_len:] = predictions.flatten()
+st.line_chart(input_df[['Close', 'Predictions']])
