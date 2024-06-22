@@ -10,3 +10,4 @@ fonttools
 kiwisolver
 matplotlib
 pyparsing
+uv
