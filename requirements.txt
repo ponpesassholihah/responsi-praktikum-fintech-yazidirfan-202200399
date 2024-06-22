@@ -4,9 +4,9 @@ pandas
 numpy
 scikit-learn
 tensorflow
-contourpy==1.2.1
-cycler==0.12.1
-fonttools==4.53.0
-kiwisolver==1.4.5
+contourpy
+cycler
+fonttools
+kiwisolver
 matplotlib
-pyparsing==3.1.2
+pyparsing
