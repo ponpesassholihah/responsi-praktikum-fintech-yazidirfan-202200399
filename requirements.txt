@@ -1,9 +1,9 @@
 yfinance
-streamlit
+streamlit==1.36.0 
 pandas
 numpy
 scikit-learn
-tensorflow>=2.6.0
+tensorflow
 contourpy
 cycler
 fonttools
