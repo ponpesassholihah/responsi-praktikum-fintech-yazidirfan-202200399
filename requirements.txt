@@ -3,7 +3,7 @@ streamlit
 pandas
 numpy
 scikit-learn
-tensorflow
+tensorflow==2.10.0
 matplotlib
 contourpy==1.2.1
 cycler==0.12.1
