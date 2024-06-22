@@ -11,3 +11,7 @@ headless = true\n\
 enableCORS=false\n\
 port = $PORT\n\
 " > ~/.streamlit/config.toml
+
+python -m venv myenv
+source myenv/bin/activate  # Pada macOS/Linux
+.\myenv\Scripts\activate   # Pada Windows
